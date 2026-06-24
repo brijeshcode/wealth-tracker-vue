@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/* ── Dark mode: toggled by .dark on <html> ─────────────────────── */
+@variant dark (&:is(.dark *));
+
+/* ── Design tokens ─────────────────────────────────────────────── */
+:root {
+  --wt-page:      #F7F7FA;
+  --wt-surface:   #FFFFFF;
+  --wt-elevated:  #F0F0F6;
+  --wt-border:    #E4E4ED;
+  --wt-ink:       #0A0A0F;
+  --wt-ink-dim:   #66668A;
+  --wt-ink-ghost: #AAAAC0;
+  --wt-gold:      #9E7B0C;
+  --wt-gold-hi:   #C9A227;
+  --wt-gain:      #16A34A;
+  --wt-loss:      #DC2626;
+  --wt-warning:   #D97706;
+}
+
+.dark {
+  --wt-page:      #0A0A0F;
+  --wt-surface:   #111118;
+  --wt-elevated:  #1A1A26;
+  --wt-border:    #222232;
+  --wt-ink:       #F4F4F8;
+  --wt-ink-dim:   #8888A0;
+  --wt-ink-ghost: #4A4A5E;
+  --wt-gold:      #C9A227;
+  --wt-gold-hi:   #F0C040;
+  --wt-gain:      #22C55E;
+  --wt-loss:      #EF4444;
+  --wt-warning:   #F59E0B;
+}
+
+/* ── Register into Tailwind utilities (inline = use CSS var at runtime) ── */
+@theme inline {
+  --font-family-sans: "Inter", system-ui, sans-serif;
+  --font-family-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  --color-page:      var(--wt-page);
+  --color-surface:   var(--wt-surface);
+  --color-elevated:  var(--wt-elevated);
+  --color-border:    var(--wt-border);
+  --color-ink:       var(--wt-ink);
+  --color-ink-dim:   var(--wt-ink-dim);
+  --color-ink-ghost: var(--wt-ink-ghost);
+  --color-gold:      var(--wt-gold);
+  --color-gold-hi:   var(--wt-gold-hi);
+  --color-gain:      var(--wt-gain);
+  --color-loss:      var(--wt-loss);
+  --color-warning:   var(--wt-warning);
+}
+
+/* ── Base ──────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background-color: var(--wt-page);
+  color: var(--wt-ink);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Noise texture utility ─────────────────────────────────────── */
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ── Reduced motion ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

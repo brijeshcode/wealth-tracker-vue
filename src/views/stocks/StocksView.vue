@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { Plus, PlusCircle, ChevronRight, Eye } from 'lucide-vue-next'
 import { useStocksStore } from '@/stores/useStocksStore'
 import type { StockHolding } from '@/types/stocks'
 import AppCard from '@/components/ui/AppCard.vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AddTransactionSlideOver from '@/components/stocks/AddTransactionSlideOver.vue'
+import QuickTransactionPanel from '@/components/stocks/QuickTransactionPanel.vue'
 
 const store = useStocksStore()
+const router = useRouter()
 onMounted(() => store.fetchHoldings())
 
 // ── Grouped data ──────────────────────────────────────────────────────────────
@@ -117,6 +123,17 @@ const fmtCurrency = (n: number) =>
 
 const fmtQty = (n: number) =>
   new Intl.NumberFormat('en-IN', { maximumFractionDigits: 4 }).format(n)
+
+// ── Transaction panels ────────────────────────────────────────────────────────
+
+const addOpen = ref(false)
+const quickOpen = ref(false)
+const quickStock = ref<{ id: number; company_name: string; nse_symbol: string | null } | null>(null)
+
+const openQuick = (group: StockGroup) => {
+  quickStock.value = { id: group.stockId, company_name: group.companyName, nse_symbol: group.symbol }
+  quickOpen.value = true
+}
 </script>
 
 <template>
@@ -127,6 +144,10 @@ const fmtQty = (n: number) =>
         <h1 class="text-xl font-semibold text-ink">Stocks</h1>
         <p class="mt-0.5 text-sm text-ink-dim">{{ groups.length }} stocks across all platforms</p>
       </div>
+      <AppButton @click="addOpen = true">
+        <Plus class="h-4 w-4" />
+        Add Transaction
+      </AppButton>
     </div>
 
     <!-- Summary cards -->
@@ -185,41 +206,24 @@ const fmtQty = (n: number) =>
       <table v-else class="w-full text-sm">
         <thead>
           <tr class="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-ghost">
-            <th class="py-3 pl-5 pr-3 w-6"></th>
-            <th class="py-3 px-3">Stock</th>
+            <th class="py-3 pl-5 pr-3">Stock</th>
             <th class="py-3 px-3 text-right">Qty</th>
             <th class="py-3 px-3 text-right">Avg Price</th>
             <th class="py-3 px-3 text-right">Current Price</th>
             <th class="py-3 px-3 text-right">Value</th>
-            <th class="py-3 pl-3 pr-5 text-right">P&amp;L</th>
+            <th class="py-3 px-3 text-right">P&amp;L</th>
+            <th class="py-3 pl-3 pr-5 text-right">Actions</th>
           </tr>
         </thead>
         <tbody>
           <template v-for="group in groups" :key="group.stockId">
             <!-- Stock row -->
             <tr
-              class="cursor-pointer border-b border-border transition-colors hover:bg-elevated"
+              class="border-b border-border transition-colors hover:bg-elevated"
               :class="expanded.has(group.stockId) ? 'bg-elevated' : ''"
-              @click="toggle(group.stockId)"
             >
-              <!-- Chevron -->
-              <td class="py-3.5 pl-5 pr-3">
-                <svg
-                  class="h-4 w-4 text-ink-ghost transition-transform duration-200"
-                  :class="expanded.has(group.stockId) ? 'rotate-90' : ''"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M7.293 4.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-              </td>
-
               <!-- Name + symbol -->
-              <td class="py-3.5 px-3">
+              <td class="py-3.5 pl-5 pr-3">
                 <p class="font-medium text-ink">{{ group.companyName }}</p>
                 <p v-if="group.symbol" class="mt-0.5 text-xs text-ink-ghost font-mono">
                   {{ group.symbol }}
@@ -250,7 +254,7 @@ const fmtQty = (n: number) =>
               </td>
 
               <!-- P&L -->
-              <td class="py-3.5 pl-3 pr-5 text-right">
+              <td class="py-3.5 px-3 text-right">
                 <template v-if="group.unrealizedPnl !== null">
                   <p
                     class="font-mono font-medium"
@@ -267,6 +271,40 @@ const fmtQty = (n: number) =>
                 </template>
                 <span v-else class="text-ink-ghost">—</span>
               </td>
+
+              <!-- Actions -->
+              <td class="py-3.5 pl-3 pr-5">
+                <div class="flex items-center justify-end gap-1">
+                  <!-- Expand platform rows -->
+                  <button
+                    class="rounded-lg p-1.5 text-ink-ghost transition-colors hover:bg-elevated hover:text-ink"
+                    :class="expanded.has(group.stockId) ? 'text-ink' : ''"
+                    :title="expanded.has(group.stockId) ? 'Collapse' : 'Expand platforms'"
+                    @click="toggle(group.stockId)"
+                  >
+                    <ChevronRight
+                      class="h-4 w-4 transition-transform duration-200"
+                      :class="expanded.has(group.stockId) ? 'rotate-90' : ''"
+                    />
+                  </button>
+                  <!-- Add transaction -->
+                  <button
+                    class="rounded-lg p-1.5 text-ink-ghost transition-colors hover:bg-elevated hover:text-gold"
+                    title="Add transaction"
+                    @click="openQuick(group)"
+                  >
+                    <PlusCircle class="h-4 w-4" />
+                  </button>
+                  <!-- Detail -->
+                  <button
+                    class="rounded-lg p-1.5 text-ink-ghost transition-colors hover:bg-elevated hover:text-gold"
+                    title="View detail"
+                    @click="router.push('/stocks/' + group.stockId)"
+                  >
+                    <Eye class="h-4 w-4" />
+                  </button>
+                </div>
+              </td>
             </tr>
 
             <!-- Platform breakdown rows (expanded) -->
@@ -276,13 +314,9 @@ const fmtQty = (n: number) =>
                 :key="platform.holdingId"
                 class="border-b border-border bg-page text-ink-dim"
               >
-                <!-- Indent spacer -->
-                <td class="pl-5 pr-3"></td>
-
                 <!-- Platform name + exchange badge -->
-                <td class="py-2.5 px-3">
+                <td class="py-2.5 pl-5 pr-3">
                   <div class="flex items-center gap-2">
-                    <!-- indent line -->
                     <span class="ml-3 mr-1 inline-block h-3 w-px bg-border"></span>
                     <span class="text-ink-dim">{{ platform.platformName }}</span>
                     <span
@@ -308,7 +342,7 @@ const fmtQty = (n: number) =>
                   ₹{{ fmt(platform.avgBuyPrice) }}
                 </td>
 
-                <!-- Current price (same, leave empty for sub-row) -->
+                <!-- Current price (empty for sub-row) -->
                 <td class="py-2.5 px-3"></td>
 
                 <!-- Value -->
@@ -317,7 +351,7 @@ const fmtQty = (n: number) =>
                 </td>
 
                 <!-- % share -->
-                <td class="py-2.5 pl-3 pr-5">
+                <td class="py-2.5 px-3 text-right">
                   <div class="flex items-center justify-end gap-2">
                     <div class="h-1.5 w-20 overflow-hidden rounded-full bg-elevated">
                       <div
@@ -330,11 +364,22 @@ const fmtQty = (n: number) =>
                     </span>
                   </div>
                 </td>
+
+                <!-- empty actions cell -->
+                <td class="py-2.5 pl-3 pr-5"></td>
               </tr>
             </template>
           </template>
         </tbody>
       </table>
     </AppCard>
+
+    <!-- Transaction panels -->
+    <AddTransactionSlideOver v-model="addOpen" />
+    <QuickTransactionPanel
+      v-if="quickStock"
+      v-model="quickOpen"
+      :stock="quickStock"
+    />
   </div>
 </template>
