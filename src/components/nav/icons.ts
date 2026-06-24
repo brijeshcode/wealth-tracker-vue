@@ -1,0 +1,38 @@
+import type { Component } from 'vue'
+import {
+  LayoutDashboard,
+  Briefcase,
+  Landmark,
+  TrendingUp,
+  PieChart,
+  Banknote,
+  CalendarClock,
+  Upload,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Sun,
+  Moon,
+  LayoutPanelLeft,
+  LayoutPanelTop,
+  LogOut,
+} from 'lucide-vue-next'
+
+export const iconMap: Record<string, Component> = {
+  'layout-dashboard': LayoutDashboard,
+  'briefcase': Briefcase,
+  'landmark': Landmark,
+  'trending-up': TrendingUp,
+  'pie-chart': PieChart,
+  'banknote': Banknote,
+  'calendar-clock': CalendarClock,
+  'upload': Upload,
+  'chevron-down': ChevronDown,
+  'chevron-left': ChevronLeft,
+  'chevron-right': ChevronRight,
+  'sun': Sun,
+  'moon': Moon,
+  'layout-sidebar': LayoutPanelLeft,
+  'layout-panel-top': LayoutPanelTop,
+  'log-out': LogOut,
+}
