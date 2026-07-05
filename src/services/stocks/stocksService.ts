@@ -1,4 +1,5 @@
-import { get, post, put, del } from '@/services/axios'
+import type { AxiosResponse } from 'axios'
+import { get, post, put, del, type ApiResponse } from '@/services/axios'
 import type {
   StockHolding,
   HoldingMetrics,
@@ -9,6 +10,11 @@ import type {
   CreateTransactionPayload,
   UpdateTransactionPayload,
   UpdateHoldingPayload,
+  ImportBroker,
+  ImportPreviewData,
+  ImportRow,
+  ImportConfirmResult,
+  ImportWarning,
 } from '@/types/stocks'
 
 class StocksService {
@@ -109,6 +115,36 @@ class StocksService {
       showSuccessNotification: true,
       successMessage: 'Transaction deleted',
     })
+  }
+
+  // ── Import ──────────────────────────────────────────────────────────
+
+  async importPreview(file: File, broker: ImportBroker): Promise<ImportPreviewData> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('broker', broker)
+    const response = await post<ImportPreviewData>(
+      '/stock-transactions/import/preview',
+      formData,
+      { loadingMessage: 'Analyzing file...' },
+    )
+    return response.data.data!
+  }
+
+  // Resolves on 200 and 409 (expected duplicate flow — avoids the global
+  // error toast); rejects on 422. Caller inspects response.status.
+  async importConfirm(
+    rows: ImportRow[],
+    ignoreWarnings: boolean,
+  ): Promise<AxiosResponse<ApiResponse<ImportConfirmResult | { warnings: ImportWarning[] }>>> {
+    return post(
+      '/stock-transactions/import/confirm',
+      { rows, ignore_warnings: ignoreWarnings },
+      {
+        loadingMessage: 'Importing...',
+        validateStatus: (status) => (status >= 200 && status < 300) || status === 409,
+      },
+    )
   }
 }
 

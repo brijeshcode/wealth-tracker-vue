@@ -127,3 +127,48 @@ export interface UpdateHoldingPayload {
   nickname?: string | null
   notes?: string | null
 }
+
+// ── Import ──────────────────────────────────────────────────────────
+
+export type ImportBroker = 'standard' | 'zerodha' | 'groww' | 'upstox'
+
+export interface ImportRow {
+  transaction_date: string // "YYYY-MM-DD HH:mm:ss"
+  symbol: string
+  exchange: Exchange
+  type: TransactionType
+  quantity: number | null // null for non-buy/sell types
+  price_per_unit: number | null // null for non-buy/sell types
+  platform: string
+  reference: string | null
+  nickname: string | null
+  notes: string | null
+}
+
+export interface ImportRowError {
+  row: number
+  column: string
+  error: string
+}
+
+export interface ImportWarning {
+  row: number
+  message: string
+}
+
+export interface ImportSummary {
+  total: number
+  buy: number
+  sell: number
+}
+
+export interface ImportPreviewData {
+  summary: ImportSummary
+  warnings: ImportWarning[]
+  rows: ImportRow[]
+}
+
+export interface ImportConfirmResult {
+  imported: number
+  holdings_synced: number
+}
