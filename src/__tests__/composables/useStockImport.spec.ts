@@ -5,21 +5,21 @@ import { push } from 'notivue'
 import type { ImportPreviewData, ImportRow } from '@/types/stocks'
 
 const { routerPush, mockStore } = vi.hoisted(() => ({
-  routerPush: vi.fn(),
-  mockStore: { fetchHoldings: vi.fn() },
+  routerPush: vi.fn<() => void>(),
+  mockStore: { fetchHoldings: vi.fn<() => Promise<void>>() },
 }))
 
 vi.mock('@/services/stocks/stocksService', () => ({
   stocksService: {
-    importPreview: vi.fn(),
-    importConfirm: vi.fn(),
+    importPreview: vi.fn<() => Promise<ImportPreviewData>>(),
+    importConfirm: vi.fn<() => Promise<unknown>>(),
   },
 }))
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush }),
 }))
 vi.mock('notivue', () => ({
-  push: { success: vi.fn(), error: vi.fn() },
+  push: { success: vi.fn<() => void>(), error: vi.fn<() => void>() },
 }))
 vi.mock('@/stores/useStocksStore', () => ({
   useStocksStore: () => mockStore,
