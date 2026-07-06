@@ -26,6 +26,7 @@ const router = createRouter({
         { path: 'dashboard', component: () => import('@/views/DashboardView.vue') },
         { path: 'fd', component: () => import('@/views/fd/FdView.vue') },
         { path: 'stocks', component: () => import('@/views/stocks/StocksView.vue') },
+        { path: 'stocks/import', component: () => import('@/views/stocks/StockImportView.vue') },
         { path: 'stocks/:stockId', component: () => import('@/views/stocks/StockDetailView.vue') },
         { path: 'mf', component: () => import('@/views/mf/MfView.vue') },
         { path: 'income', component: () => import('@/views/IncomeView.vue') },

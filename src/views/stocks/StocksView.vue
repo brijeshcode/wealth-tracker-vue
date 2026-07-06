@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, PlusCircle, ChevronRight, Eye } from 'lucide-vue-next'
+import { Plus, PlusCircle, ChevronRight, Eye, Upload } from 'lucide-vue-next'
 import { useStocksStore } from '@/stores/useStocksStore'
 import type { StockHolding } from '@/types/stocks'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -144,10 +144,16 @@ const openQuick = (group: StockGroup) => {
         <h1 class="text-xl font-semibold text-ink">Stocks</h1>
         <p class="mt-0.5 text-sm text-ink-dim">{{ groups.length }} stocks across all platforms</p>
       </div>
-      <AppButton @click="addOpen = true">
-        <Plus class="h-4 w-4" />
-        Add Transaction
-      </AppButton>
+      <div class="flex items-center gap-2">
+        <AppButton variant="ghost" @click="router.push('/stocks/import')">
+          <Upload class="h-4 w-4" />
+          Import
+        </AppButton>
+        <AppButton @click="addOpen = true">
+          <Plus class="h-4 w-4" />
+          Add Transaction
+        </AppButton>
+      </div>
     </div>
 
     <!-- Summary cards -->
