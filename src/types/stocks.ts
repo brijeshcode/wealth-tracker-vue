@@ -130,7 +130,7 @@ export interface UpdateHoldingPayload {
 
 // ── Import ──────────────────────────────────────────────────────────
 
-export type ImportBroker = 'standard' | 'zerodha' | 'Groww' | 'Upstox'
+export type ImportBroker = 'standard' | 'zerodha' | 'groww' | 'upstox'
 
 export interface ImportRow {
   transaction_date: string // "YYYY-MM-DD HH:mm:ss"
