@@ -93,7 +93,7 @@ describe('useStockImport', () => {
 
       expect(stocksService.importPreview).toHaveBeenCalledWith(imp.file.value, 'zerodha')
       expect(imp.summary.value).toEqual({ total: 1, buy: 1, sell: 0 })
-      expect(imp.rows.value).toEqual([sampleRow])
+      expect(imp.rows.value).toEqual([{ ...sampleRow, platform: 'zerodha' }])
       expect(imp.warnings.value).toHaveLength(1)
       expect(imp.step.value).toBe('preview')
       expect(imp.previewing.value).toBe(false)

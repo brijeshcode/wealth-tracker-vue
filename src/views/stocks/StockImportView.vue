@@ -24,17 +24,17 @@ const imp = useStockImport()
 const brokers: { value: ImportBroker; label: string }[] = [
   { value: 'standard', label: 'Standard' },
   { value: 'zerodha', label: 'Zerodha' },
-  { value: 'groww', label: 'Groww' },
-  { value: 'upstox', label: 'Upstox' },
+  { value: 'Groww', label: 'Groww' },
+  { value: 'Upstox', label: 'Upstox' },
 ]
 
 const brokerNotes: Record<ImportBroker, string> = {
   standard:
     'CSV columns must exactly match: transaction_date, symbol, exchange, type, quantity, price_per_unit, platform, reference',
   zerodha: 'Export from Console → Reports → Tradebook. F&O rows are filtered out automatically.',
-  groww:
+  Groww:
     'Export CSV from the Groww app → My Investments → P&L. Only "Executed" orders are imported.',
-  upstox:
+  Upstox:
     'Export Excel from Upstox → Reports → Trade History. Replace abbreviated company names with correct NSE ticker symbols before uploading (e.g. PUNJAB NATBK → PNBBANK).',
 }
 

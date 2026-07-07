@@ -47,7 +47,7 @@ export function useStockImport() {
       const data = await stocksService.importPreview(file.value, broker.value)
       summary.value = data.summary
       warnings.value = data.warnings
-      rows.value = data.rows.map((r) => ({ ...r }))
+      rows.value = data.rows.map((r) => ({ ...r, platform: broker.value }))
       step.value = 'preview'
     } catch (err) {
       captureRowErrors(err)
