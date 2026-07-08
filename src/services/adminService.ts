@@ -1,6 +1,14 @@
 import type { AxiosResponse } from 'axios'
-import { get, post, type ApiResponse } from '@/services/axios'
-import type { AdminUser, NseImportResult, StockUpsertPayload, StockMasterRecord } from '@/types/admin'
+import { get, post, put, patch, type ApiResponse } from '@/services/axios'
+import type {
+  AdminUser,
+  NseImportResult,
+  StockUpsertPayload,
+  StockMasterRecord,
+  AdminStockListParams,
+  AdminStockListResult,
+  AdminStockUpdatePayload,
+} from '@/types/admin'
 
 class AdminService {
   checkAccess(): Promise<AxiosResponse<ApiResponse<AdminUser>>> {
@@ -26,6 +34,27 @@ class AdminService {
       stock: response.data.data!,
       created: response.status === 201,
     }
+  }
+
+  async listStocks(params: AdminStockListParams): Promise<AdminStockListResult> {
+    const response = await get('/admin/stocks', { params })
+    const raw = response.data as any
+    const meta = raw.meta ?? raw.pagination ?? {
+      current_page: 1,
+      last_page: 1,
+      total: Array.isArray(raw.data) ? raw.data.length : 0,
+    }
+    return { stocks: raw.data ?? [], meta }
+  }
+
+  async updateStock(id: number, data: AdminStockUpdatePayload): Promise<StockMasterRecord> {
+    const response = await put<StockMasterRecord>(`/admin/stocks/${id}`, data)
+    return response.data.data!
+  }
+
+  async toggleStockActive(id: number): Promise<StockMasterRecord> {
+    const response = await patch<StockMasterRecord>(`/admin/stocks/${id}/toggle-active`)
+    return response.data.data!
   }
 }
 

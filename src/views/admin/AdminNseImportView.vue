@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { UploadCloud, FileSpreadsheet, X, CheckCircle2, AlertCircle } from 'lucide-vue-next'
+import { UploadCloud, FileSpreadsheet, X, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-vue-next'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import { adminService } from '@/services/adminService'
@@ -81,6 +81,15 @@ const runImport = async () => {
       <p class="mt-0.5 text-sm text-ink-dim">
         Upload EQUITY_L.csv from NSE India to refresh the stock master. Safe to re-run anytime.
       </p>
+      <a
+        href="https://www.nseindia.com/market-data/securities-available-for-trading"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="mt-2 inline-flex items-center gap-1.5 text-sm text-gold hover:underline"
+      >
+        <ExternalLink class="h-3.5 w-3.5" />
+        Download EQUITY_L.csv from NSE India
+      </a>
     </div>
 
     <!-- Result -->

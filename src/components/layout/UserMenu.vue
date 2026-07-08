@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { LogOut } from 'lucide-vue-next'
+import { useRouter, RouterLink } from 'vue-router'
+import { LogOut, ShieldCheck } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/useAuthStore'
 
 const router = useRouter()
@@ -49,6 +49,14 @@ function close() {
 
       <!-- Actions -->
       <div class="p-1">
+        <RouterLink
+          to="/admin"
+          class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-dim transition-colors hover:bg-elevated hover:text-ink"
+          @click="open = false"
+        >
+          <ShieldCheck :size="14" />
+          Admin Panel
+        </RouterLink>
         <button
           class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-loss transition-colors hover:bg-elevated"
           @click="logout"

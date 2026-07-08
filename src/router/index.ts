@@ -49,6 +49,10 @@ const router = createRouter({
           path: 'stocks/upsert',
           component: () => import('@/views/admin/AdminStockUpsertView.vue'),
         },
+        {
+          path: 'stocks/list',
+          component: () => import('@/views/admin/AdminStockListView.vue'),
+        },
       ],
     },
   ],
