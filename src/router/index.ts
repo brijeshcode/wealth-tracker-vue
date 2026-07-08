@@ -34,6 +34,23 @@ const router = createRouter({
         { path: 'import', component: () => import('@/views/ImportView.vue') },
       ],
     },
+    // ── Admin routes ─────────────────────────────────────────────────
+    {
+      path: '/admin',
+      component: () => import('@/layouts/AdminLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        { path: '', redirect: '/admin/stocks/import-nse' },
+        {
+          path: 'stocks/import-nse',
+          component: () => import('@/views/admin/AdminNseImportView.vue'),
+        },
+        {
+          path: 'stocks/upsert',
+          component: () => import('@/views/admin/AdminStockUpsertView.vue'),
+        },
+      ],
+    },
   ],
 })
 
