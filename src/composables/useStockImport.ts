@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { push } from 'notivue'
 import { stocksService } from '@/services/stocks/stocksService'
@@ -31,6 +31,18 @@ export function useStockImport() {
   const showDuplicateDialog = ref(false)
   const result = ref<ImportConfirmResult | null>(null)
 
+  const definiteDuplicates = computed(() =>
+    warnings.value.filter((w) => w.message.startsWith('Definitive duplicate')),
+  )
+  const hasDefinitiveDuplicates = computed(() => definiteDuplicates.value.length > 0)
+  const duplicateRowNumbers = computed(() => new Set(definiteDuplicates.value.map((w) => w.row)))
+  const importableRows = computed(() =>
+    rows.value.filter((_, i) => !duplicateRowNumbers.value.has(i + 1)),
+  )
+  const allRowsDuplicate = computed(
+    () => rows.value.length > 0 && importableRows.value.length === 0,
+  )
+
   const captureRowErrors = (err: unknown) => {
     const response = (err as { response?: { status?: number; data?: { errors?: unknown } } })
       .response
@@ -60,7 +72,7 @@ export function useStockImport() {
     rowErrors.value = []
     confirming.value = true
     try {
-      const response = await stocksService.importConfirm(rows.value, ignoreWarnings)
+      const response = await stocksService.importConfirm(importableRows.value, ignoreWarnings)
       if (response.status === 409) {
         duplicateWarnings.value =
           (response.data.data as { warnings: ImportWarning[] }).warnings
@@ -107,6 +119,10 @@ export function useStockImport() {
     duplicateWarnings,
     showDuplicateDialog,
     result,
+    definiteDuplicates,
+    hasDefinitiveDuplicates,
+    importableRows,
+    allRowsDuplicate,
     preview,
     confirmImport,
     reset,

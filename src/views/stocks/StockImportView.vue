@@ -6,6 +6,7 @@ import {
   UploadCloud,
   FileSpreadsheet,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   X,
 } from 'lucide-vue-next'
@@ -201,37 +202,92 @@ const fileSizeLabel = computed(() => {
         </AppCard>
       </div>
 
-      <!-- Warnings banner / ready state -->
+      <!-- All rows duplicate — blocking error -->
       <div
-        v-if="imp.warnings.value.length"
-        class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3"
+        v-if="imp.allRowsDuplicate.value"
+        class="overflow-hidden rounded-xl border border-loss/40"
       >
-        <div class="flex items-center gap-2">
-          <AlertTriangle class="h-4 w-4 shrink-0 text-amber-500" />
-          <p class="text-sm font-medium text-amber-600 dark:text-amber-400">
-            {{ imp.warnings.value.length }} warning{{
-              imp.warnings.value.length === 1 ? '' : 's'
+        <div class="flex items-center gap-2 border-b border-loss/40 bg-loss/10 px-4 py-3">
+          <AlertCircle class="h-4 w-4 shrink-0 text-loss" />
+          <p class="text-sm font-medium text-loss">
+            All {{ imp.definiteDuplicates.value.length }} transaction{{
+              imp.definiteDuplicates.value.length === 1 ? '' : 's'
             }}
-            — review before importing
+            already exist — nothing to import
           </p>
         </div>
-        <ul class="mt-2 space-y-1 pl-6">
+        <ul class="divide-y divide-border">
           <li
-            v-for="(w, i) in imp.warnings.value"
+            v-for="(w, i) in imp.definiteDuplicates.value"
             :key="i"
-            class="text-xs text-amber-600/90 dark:text-amber-400/90"
+            class="px-4 py-2.5 text-xs text-ink-dim"
           >
             Row {{ w.row }}: {{ w.message }}
           </li>
         </ul>
       </div>
+
+      <!-- Partial duplicates — will be skipped -->
       <div
-        v-else
-        class="flex items-center gap-2 rounded-xl border border-gain/40 bg-gain/10 px-4 py-3"
+        v-else-if="imp.hasDefinitiveDuplicates.value"
+        class="overflow-hidden rounded-xl border border-amber-500/40"
       >
-        <CheckCircle2 class="h-4 w-4 shrink-0 text-gain" />
-        <p class="text-sm font-medium text-gain">No warnings — ready to import</p>
+        <div class="flex items-center gap-2 border-b border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <AlertTriangle class="h-4 w-4 shrink-0 text-amber-500" />
+          <p class="text-sm font-medium text-amber-600 dark:text-amber-400">
+            {{ imp.definiteDuplicates.value.length }} row{{
+              imp.definiteDuplicates.value.length === 1 ? '' : 's'
+            }}
+            will be skipped — {{ imp.importableRows.value.length }} new transaction{{
+              imp.importableRows.value.length === 1 ? '' : 's'
+            }}
+            will be imported
+          </p>
+        </div>
+        <ul class="divide-y divide-border">
+          <li
+            v-for="(w, i) in imp.definiteDuplicates.value"
+            :key="i"
+            class="px-4 py-2.5 text-xs text-ink-dim"
+          >
+            Row {{ w.row }}: {{ w.message }}
+          </li>
+        </ul>
       </div>
+
+      <!-- Regular warnings banner / ready state -->
+      <template v-else>
+        <div
+          v-if="imp.warnings.value.length"
+          class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3"
+        >
+          <div class="flex items-center gap-2">
+            <AlertTriangle class="h-4 w-4 shrink-0 text-amber-500" />
+            <p class="text-sm font-medium text-amber-600 dark:text-amber-400">
+              {{ imp.warnings.value.length }} warning{{
+                imp.warnings.value.length === 1 ? '' : 's'
+              }}
+              — review before importing
+            </p>
+          </div>
+          <ul class="mt-2 space-y-1 pl-6">
+            <li
+              v-for="(w, i) in imp.warnings.value"
+              :key="i"
+              class="text-xs text-amber-600/90 dark:text-amber-400/90"
+            >
+              Row {{ w.row }}: {{ w.message }}
+            </li>
+          </ul>
+        </div>
+        <div
+          v-else
+          class="flex items-center gap-2 rounded-xl border border-gain/40 bg-gain/10 px-4 py-3"
+        >
+          <CheckCircle2 class="h-4 w-4 shrink-0 text-gain" />
+          <p class="text-sm font-medium text-gain">No warnings — ready to import</p>
+        </div>
+      </template>
 
       <!-- Confirm 422 errors -->
       <ImportErrorTable :errors="imp.rowErrors.value" />
@@ -242,9 +298,13 @@ const fileSizeLabel = computed(() => {
       <!-- Footer actions -->
       <div class="flex justify-end gap-3">
         <AppButton variant="ghost" @click="imp.reset()">Back</AppButton>
-        <AppButton :loading="imp.confirming.value" @click="imp.confirmImport(false)">
-          Import {{ imp.rows.value.length }} transaction{{
-            imp.rows.value.length === 1 ? '' : 's'
+        <AppButton
+          :disabled="imp.allRowsDuplicate.value"
+          :loading="imp.confirming.value"
+          @click="imp.confirmImport(false)"
+        >
+          Import {{ imp.importableRows.value.length }} transaction{{
+            imp.importableRows.value.length === 1 ? '' : 's'
           }}
         </AppButton>
       </div>

@@ -126,6 +126,83 @@ describe('useStockImport', () => {
     })
   })
 
+  describe('definiteDuplicates / importableRows', () => {
+    it('returns warnings that start with "Definitive duplicate"', async () => {
+      vi.mocked(stocksService.importPreview).mockResolvedValue({
+        ...previewData,
+        warnings: [
+          { row: 1, message: 'Definitive duplicate: reference 123 exists' },
+          { row: 2, message: 'Possible duplicate' },
+        ],
+      })
+      const imp = useStockImport()
+      imp.file.value = makeFile()
+      await imp.preview()
+
+      expect(imp.definiteDuplicates.value).toEqual([
+        { row: 1, message: 'Definitive duplicate: reference 123 exists' },
+      ])
+      expect(imp.hasDefinitiveDuplicates.value).toBe(true)
+    })
+
+    it('hasDefinitiveDuplicates is false when no definitive duplicates', async () => {
+      vi.mocked(stocksService.importPreview).mockResolvedValue(previewData)
+      const imp = useStockImport()
+      imp.file.value = makeFile()
+      await imp.preview()
+
+      expect(imp.definiteDuplicates.value).toHaveLength(0)
+      expect(imp.hasDefinitiveDuplicates.value).toBe(false)
+    })
+
+    it('importableRows excludes rows at duplicate positions', async () => {
+      const row1 = { ...sampleRow, reference: 'DUP1' }
+      const row2 = { ...sampleRow, reference: 'NEW1' }
+      vi.mocked(stocksService.importPreview).mockResolvedValue({
+        summary: { total: 2, buy: 2, sell: 0 },
+        warnings: [{ row: 1, message: 'Definitive duplicate: reference DUP1 exists' }],
+        rows: [row1, row2],
+      })
+      const imp = useStockImport()
+      imp.file.value = makeFile()
+      await imp.preview()
+
+      expect(imp.importableRows.value).toEqual([row2])
+      expect(imp.allRowsDuplicate.value).toBe(false)
+    })
+
+    it('allRowsDuplicate is true when every row is a definitive duplicate', async () => {
+      vi.mocked(stocksService.importPreview).mockResolvedValue({
+        summary: { total: 1, buy: 1, sell: 0 },
+        warnings: [{ row: 1, message: 'Definitive duplicate: reference 123 exists' }],
+        rows: [sampleRow],
+      })
+      const imp = useStockImport()
+      imp.file.value = makeFile()
+      await imp.preview()
+
+      expect(imp.importableRows.value).toHaveLength(0)
+      expect(imp.allRowsDuplicate.value).toBe(true)
+    })
+
+    it('confirmImport sends only importableRows when some are duplicates', async () => {
+      const row1 = { ...sampleRow, reference: 'DUP1' }
+      const row2 = { ...sampleRow, reference: 'NEW1' }
+      vi.mocked(stocksService.importPreview).mockResolvedValue({
+        summary: { total: 2, buy: 2, sell: 0 },
+        warnings: [{ row: 1, message: 'Definitive duplicate: reference DUP1 exists' }],
+        rows: [row1, row2],
+      })
+      vi.mocked(stocksService.importConfirm).mockResolvedValue(confirm200)
+      const imp = useStockImport()
+      imp.file.value = makeFile()
+      await imp.preview()
+      await imp.confirmImport()
+
+      expect(stocksService.importConfirm).toHaveBeenCalledWith([row2], false)
+    })
+  })
+
   describe('confirmImport', () => {
     const setupPreviewed = async () => {
       vi.mocked(stocksService.importPreview).mockResolvedValue(previewData)
