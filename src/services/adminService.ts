@@ -8,6 +8,10 @@ import type {
   AdminStockListParams,
   AdminStockListResult,
   AdminStockUpdatePayload,
+  PriceSyncResult,
+  BackfillResult,
+  SyncLog,
+  SyncLogParams,
 } from '@/types/admin'
 
 class AdminService {
@@ -55,6 +59,28 @@ class AdminService {
   async toggleStockActive(id: number): Promise<StockMasterRecord> {
     const response = await patch<StockMasterRecord>(`/admin/stocks/${id}/toggle-active`)
     return response.data.data!
+  }
+
+  async syncPrices(date?: string): Promise<PriceSyncResult> {
+    const response = await post<PriceSyncResult>(
+      '/admin/stocks/sync-prices',
+      undefined,
+      { params: date ? { date } : undefined },
+    )
+    return response.data.data!
+  }
+
+  async backfillPrices(from: string, to: string): Promise<BackfillResult> {
+    const response = await post<BackfillResult>('/admin/stocks/sync-prices/backfill', { from, to })
+    return response.data.data!
+  }
+
+  async getSyncLogs(params: SyncLogParams): Promise<{ logs: SyncLog[]; pagination: NonNullable<import('@/services/axios').ApiResponse['pagination']> }> {
+    const response = await get<SyncLog[]>('/admin/stocks/sync-logs', { params })
+    return {
+      logs: response.data.data ?? [],
+      pagination: response.data.pagination!,
+    }
   }
 }
 

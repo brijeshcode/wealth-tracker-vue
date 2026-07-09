@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
+import { ArrowLeft, Trash2, Loader2, ChevronDown } from 'lucide-vue-next'
 import { useStockDetail } from '@/composables/useStockDetail'
+import { useStocksStore } from '@/stores/useStocksStore'
 import AppCard from '@/components/ui/AppCard.vue'
 
 const route = useRoute()
 const router = useRouter()
 const stockId = Number(route.params.stockId)
+const stocksStore = useStocksStore()
 
 const {
   stockInfo,
   holdings,
+  valuation,
+  priceDate,
   totalQty,
   weightedAvg,
   currentValue,
@@ -24,20 +28,42 @@ const {
   mergedTax,
   loading,
   fetchAll,
+  removeTransaction,
 } = useStockDetail(stockId)
 
 onMounted(fetchAll)
 
-// ── Tabs ──────────────────────────────────────────────────────────────────────
+// ── Delete transaction ────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'transactions' | 'lots' | 'tax'
-const activeTab = ref<Tab>('overview')
-const tabs: { key: Tab; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'transactions', label: 'Transactions' },
-  { key: 'lots', label: 'Lots' },
-  { key: 'tax', label: 'Tax' },
-]
+const txOpen = ref(false)
+const deletingTxId = ref<number | null>(null)
+
+async function confirmDeleteTransaction(id: number) {
+  if (!confirm('Delete this transaction? This cannot be undone.')) return
+  deletingTxId.value = id
+  try {
+    await stocksStore.deleteTransaction(id)
+    removeTransaction(id)
+  } finally {
+    deletingTxId.value = null
+  }
+}
+
+// ── Lots grouped by platform ──────────────────────────────────────────────────
+
+const lotsByPlatform = computed(() => {
+  const map = new Map<string, typeof mergedLots.value>()
+  for (const lot of mergedLots.value) {
+    const group = map.get(lot.platform_name) ?? []
+    group.push(lot)
+    map.set(lot.platform_name, group)
+  }
+  return map
+})
+
+function lotAge(buyDate: string) {
+  return Math.floor((Date.now() - new Date(buyDate).getTime()) / 86_400_000)
+}
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -61,21 +87,18 @@ const fmtDate = (d: string) =>
 <template>
   <div class="space-y-6 p-6">
 
-    <!-- Back breadcrumb -->
+    <!-- Back -->
     <button
-      class="flex items-center gap-1.5 text-sm text-ink-dim transition-colors hover:text-ink"
+      class="flex cursor-pointer items-center gap-1.5 text-sm text-ink-dim transition-colors hover:text-ink"
       @click="router.push('/stocks')"
     >
       <ArrowLeft class="h-4 w-4" />
       Stocks
     </button>
 
-    <!-- Loading state -->
+    <!-- Loading -->
     <div v-if="loading && !stockInfo" class="flex items-center justify-center py-24 text-ink-dim">
-      <svg class="mr-2 h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
+      <Loader2 class="mr-2 h-5 w-5 animate-spin" />
       Loading…
     </div>
 
@@ -86,12 +109,11 @@ const fmtDate = (d: string) =>
 
     <template v-else-if="stockInfo">
 
-      <!-- ── Page Header ──────────────────────────────────────────────────── -->
+      <!-- ── Header card ──────────────────────────────────────────────────── -->
       <AppCard>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 
-          <!-- Name + badges -->
-          <div class="flex flex-col gap-2">
+          <div class="flex flex-col gap-1.5">
             <div class="flex flex-wrap items-center gap-2">
               <h1 class="text-xl font-semibold text-ink">{{ stockInfo.company_name }}</h1>
               <span
@@ -111,13 +133,15 @@ const fmtDate = (d: string) =>
               >
                 {{ isLtcg ? 'LTCG Eligible' : 'STCG' }}
               </span>
+              <span v-if="priceDate" class="text-xs text-ink-ghost">
+                Price as of {{ fmtDate(priceDate) }}
+              </span>
             </div>
           </div>
 
-          <!-- Summary numbers -->
           <div class="flex flex-wrap gap-6 text-right">
             <div>
-              <p class="text-xs font-medium uppercase tracking-wide text-ink-ghost">Total Qty</p>
+              <p class="text-xs font-medium uppercase tracking-wide text-ink-ghost">Qty</p>
               <p class="mt-0.5 font-mono text-lg font-semibold text-ink">{{ fmtQty(totalQty) }}</p>
             </div>
             <div>
@@ -151,151 +175,105 @@ const fmtDate = (d: string) =>
         </div>
       </AppCard>
 
-      <!-- ── Tab bar ─────────────────────────────────────────────────────── -->
-      <div class="flex gap-1 rounded-xl bg-elevated p-1">
+      <!-- ── Per-platform breakdown ───────────────────────────────────────── -->
+      <AppCard :padding="false">
+        <div class="border-b border-border px-4 py-3">
+          <h2 class="text-sm font-medium text-ink">Holdings by Platform</h2>
+        </div>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-ghost">
+              <th class="py-3 pl-5 pr-3">Platform</th>
+              <th class="py-3 px-3">Exchange</th>
+              <th class="py-3 px-3 text-right">Qty</th>
+              <th class="py-3 px-3 text-right">Avg Price</th>
+              <th class="py-3 px-3 text-right">Cost Basis</th>
+              <th class="py-3 pl-3 pr-5 text-right">% Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="h in holdings" :key="h.id" class="border-b border-border last:border-0">
+              <td class="py-3 pl-5 pr-3 font-medium text-ink">
+                {{ h.holding.platform.display_name }}
+              </td>
+              <td class="py-3 px-3">
+                <span
+                  class="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+                  :class="h.exchange === 'NSE'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
+                    : 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400'"
+                >
+                  {{ h.exchange }}
+                </span>
+              </td>
+              <td class="py-3 px-3 text-right font-mono text-ink">{{ fmtQty(h.quantity) }}</td>
+              <td class="py-3 px-3 text-right font-mono text-ink-dim">₹{{ fmt(h.avg_buy_price) }}</td>
+              <td class="py-3 px-3 text-right font-mono text-ink">{{ fmtCurrency(h.cost_basis) }}</td>
+              <td class="py-3 pl-3 pr-5">
+                <div class="flex items-center justify-end gap-2">
+                  <div class="h-1.5 w-20 overflow-hidden rounded-full bg-elevated">
+                    <div
+                      class="h-full rounded-full bg-gold"
+                      :style="{ width: `${totalQty > 0 ? (h.quantity / totalQty) * 100 : 0}%` }"
+                    />
+                  </div>
+                  <span class="w-10 text-right font-mono text-xs text-ink-dim">
+                    {{ fmt(totalQty > 0 ? (h.quantity / totalQty) * 100 : 0) }}%
+                  </span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </AppCard>
+
+      <!-- ── Transactions ─────────────────────────────────────────────────── -->
+      <AppCard :padding="false">
         <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          class="flex-1 rounded-lg py-2 text-sm font-medium transition-colors"
-          :class="activeTab === tab.key
-            ? 'bg-surface text-ink shadow-sm'
-            : 'text-ink-dim hover:text-ink'"
-          @click="activeTab = tab.key"
+          class="flex w-full cursor-pointer items-center justify-between px-4 py-3 text-left"
+          :class="txOpen ? 'border-b border-border' : ''"
+          @click="txOpen = !txOpen"
         >
-          {{ tab.label }}
+          <h2 class="text-sm font-medium text-ink">
+            Transactions
+            <span v-if="mergedTransactions.length" class="ml-1.5 font-normal text-ink-ghost">
+              ({{ mergedTransactions.length }})
+            </span>
+          </h2>
+          <ChevronDown
+            class="h-4 w-4 text-ink-ghost transition-transform duration-200"
+            :class="txOpen ? 'rotate-180' : ''"
+          />
         </button>
-      </div>
 
-      <!-- ── Overview Tab ─────────────────────────────────────────────────── -->
-      <div v-if="activeTab === 'overview'" class="space-y-4">
-
-        <!-- 4 summary cards -->
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <AppCard>
-            <p class="text-xs font-medium uppercase tracking-wide text-ink-ghost">Total Qty</p>
-            <p class="mt-1.5 font-mono text-2xl font-semibold text-ink">{{ fmtQty(totalQty) }}</p>
-          </AppCard>
-          <AppCard>
-            <p class="text-xs font-medium uppercase tracking-wide text-ink-ghost">Avg Buy Price</p>
-            <p class="mt-1.5 font-mono text-2xl font-semibold text-ink">₹{{ fmt(weightedAvg) }}</p>
-          </AppCard>
-          <AppCard>
-            <p class="text-xs font-medium uppercase tracking-wide text-ink-ghost">Current Value</p>
-            <p class="mt-1.5 font-mono text-2xl font-semibold text-ink">
-              {{ currentValue !== null ? fmtCurrency(currentValue) : '—' }}
-            </p>
-          </AppCard>
-          <AppCard>
-            <p class="text-xs font-medium uppercase tracking-wide text-ink-ghost">Unrealized P&amp;L</p>
-            <div class="mt-1.5 flex items-baseline gap-1.5">
-              <p
-                class="font-mono text-2xl font-semibold"
-                :class="unrealizedPnl !== null
-                  ? (unrealizedPnl >= 0 ? 'text-gain' : 'text-loss')
-                  : 'text-ink-ghost'"
-              >
-                <template v-if="unrealizedPnl !== null">
-                  {{ unrealizedPnl >= 0 ? '+' : '' }}{{ fmtCurrency(unrealizedPnl) }}
-                </template>
-                <template v-else>—</template>
-              </p>
-              <span
-                v-if="unrealizedPnlPct !== null"
-                class="text-sm font-medium"
-                :class="unrealizedPnl! >= 0 ? 'text-gain' : 'text-loss'"
-              >
-                {{ unrealizedPnl! >= 0 ? '+' : '' }}{{ fmt(unrealizedPnlPct) }}%
-              </span>
-            </div>
-          </AppCard>
+        <div v-if="loading && txOpen" class="flex items-center justify-center py-12 text-ink-dim">
+          <Loader2 class="mr-2 h-4 w-4 animate-spin" />
+          Loading…
         </div>
 
-        <!-- Per-platform breakdown -->
-        <AppCard :padding="false">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-ghost">
-                <th class="py-3 pl-5 pr-3">Platform</th>
-                <th class="py-3 px-3">Exchange</th>
-                <th class="py-3 px-3 text-right">Qty</th>
-                <th class="py-3 px-3 text-right">Avg Price</th>
-                <th class="py-3 px-3 text-right">Value</th>
-                <th class="py-3 pl-3 pr-5 text-right">% Share</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="h in holdings"
-                :key="h.id"
-                class="border-b border-border last:border-0"
-              >
-                <td class="py-3 pl-5 pr-3 font-medium text-ink">
-                  {{ h.holding.platform.display_name }}
-                </td>
-                <td class="py-3 px-3">
-                  <span
-                    class="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
-                    :class="h.exchange === 'NSE'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
-                      : 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400'"
-                  >
-                    {{ h.exchange }}
-                  </span>
-                </td>
-                <td class="py-3 px-3 text-right font-mono text-ink">{{ fmtQty(h.quantity) }}</td>
-                <td class="py-3 px-3 text-right font-mono text-ink-dim">₹{{ fmt(h.avg_buy_price) }}</td>
-                <td class="py-3 px-3 text-right font-mono text-ink">
-                  {{ fmtCurrency(h.quantity * h.avg_buy_price) }}
-                </td>
-                <td class="py-3 pl-3 pr-5">
-                  <div class="flex items-center justify-end gap-2">
-                    <div class="h-1.5 w-20 overflow-hidden rounded-full bg-elevated">
-                      <div
-                        class="h-full rounded-full bg-gold"
-                        :style="{ width: `${totalQty > 0 ? (h.quantity / totalQty) * 100 : 0}%` }"
-                      />
-                    </div>
-                    <span class="w-10 text-right font-mono text-xs text-ink-dim">
-                      {{ fmt(totalQty > 0 ? (h.quantity / totalQty) * 100 : 0) }}%
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </AppCard>
-      </div>
+        <div v-else-if="!mergedTransactions.length && txOpen" class="py-12 text-center text-sm text-ink-dim">
+          No transactions found.
+        </div>
 
-      <!-- ── Transactions Tab ────────────────────────────────────────────── -->
-      <div v-else-if="activeTab === 'transactions'">
-        <AppCard :padding="false">
-          <div v-if="loading" class="flex items-center justify-center py-12 text-ink-dim">
-            <svg class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Loading…
-          </div>
-          <div v-else-if="!mergedTransactions.length" class="py-12 text-center text-sm text-ink-dim">
-            No transactions found.
-          </div>
-          <table v-else class="w-full text-sm">
+        <div v-else-if="txOpen" class="overflow-x-auto">
+          <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-ghost">
                 <th class="py-3 pl-5 pr-3">Date</th>
                 <th class="py-3 px-3">Type</th>
                 <th class="py-3 px-3 text-right">Qty</th>
-                <th class="py-3 px-3 text-right">Price/unit</th>
+                <th class="py-3 px-3 text-right">Price / unit</th>
                 <th class="py-3 px-3 text-right">Amount</th>
                 <th class="py-3 px-3">Platform</th>
-                <th class="py-3 pl-3 pr-5">Exch</th>
+                <th class="py-3 px-3">Exch</th>
+                <th class="py-3 pl-3 pr-5"></th>
               </tr>
             </thead>
             <tbody>
               <tr
                 v-for="t in mergedTransactions"
                 :key="t.id"
-                class="border-b border-border last:border-0"
+                class="border-b border-border last:border-0 transition-colors hover:bg-elevated/40"
               >
                 <td class="py-3 pl-5 pr-3 font-mono text-xs text-ink-dim">
                   {{ fmtDate(t.transaction_date) }}
@@ -322,7 +300,7 @@ const fmtDate = (d: string) =>
                   {{ fmtCurrency(t.amount) }}
                 </td>
                 <td class="py-3 px-3 text-sm text-ink-dim">{{ t.platform_name }}</td>
-                <td class="py-3 pl-3 pr-5">
+                <td class="py-3 px-3">
                   <span
                     class="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
                     :class="t.exchange === 'NSE'
@@ -332,30 +310,37 @@ const fmtDate = (d: string) =>
                     {{ t.exchange }}
                   </span>
                 </td>
+                <td class="py-3 pl-3 pr-5">
+                  <button
+                    class="cursor-pointer rounded p-1.5 text-ink-ghost transition-colors hover:bg-elevated hover:text-loss disabled:opacity-40"
+                    title="Delete transaction"
+                    :disabled="deletingTxId === t.id"
+                    @click="confirmDeleteTransaction(t.id)"
+                  >
+                    <Trash2 class="h-3.5 w-3.5" />
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
-        </AppCard>
-      </div>
+        </div>
+      </AppCard>
 
-      <!-- ── Lots Tab ────────────────────────────────────────────────────── -->
-      <div v-else-if="activeTab === 'lots'">
-        <AppCard :padding="false">
-          <div v-if="loading" class="flex items-center justify-center py-12 text-ink-dim">
-            <svg class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Loading…
+      <!-- ── Lots ─────────────────────────────────────────────────────────── -->
+      <template v-if="mergedLots.length">
+        <AppCard
+          v-for="[platform, lots] in lotsByPlatform"
+          :key="platform"
+          :padding="false"
+        >
+          <div class="border-b border-border px-4 py-3">
+            <h2 class="text-sm font-medium text-ink">Lots — {{ platform }}</h2>
           </div>
-          <div v-else-if="!mergedLots.length" class="py-12 text-center text-sm text-ink-dim">
-            No lots found.
-          </div>
-          <table v-else class="w-full text-sm">
+          <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-ghost">
                 <th class="py-3 pl-5 pr-3">Buy Date</th>
-                <th class="py-3 px-3">Platform</th>
+                <th class="py-3 px-3 text-right">Age</th>
                 <th class="py-3 px-3 text-right">Orig Qty</th>
                 <th class="py-3 px-3 text-right">Remaining</th>
                 <th class="py-3 pl-3 pr-5">Status</th>
@@ -363,20 +348,18 @@ const fmtDate = (d: string) =>
             </thead>
             <tbody>
               <tr
-                v-for="lot in mergedLots"
+                v-for="lot in lots"
                 :key="lot.id"
                 class="border-b border-border last:border-0"
               >
-                <td class="py-3 pl-5 pr-3 font-mono text-xs text-ink-dim">
-                  {{ fmtDate(lot.buy_date) }}
+                <td class="py-3 pl-5 pr-3 font-mono text-xs text-ink-dim">{{ fmtDate(lot.buy_date) }}</td>
+                <td class="py-3 px-3 text-right tabular-nums font-mono text-sm"
+                  :class="lotAge(lot.buy_date) >= 365 ? 'text-gain' : 'text-ink-dim'"
+                >
+                  {{ lotAge(lot.buy_date) }}d
                 </td>
-                <td class="py-3 px-3 text-ink-dim">{{ lot.platform_name }}</td>
-                <td class="py-3 px-3 text-right font-mono text-ink">
-                  {{ fmtQty(lot.original_quantity) }}
-                </td>
-                <td class="py-3 px-3 text-right font-mono text-ink">
-                  {{ fmtQty(lot.quantity_remaining) }}
-                </td>
+                <td class="py-3 px-3 text-right font-mono text-ink">{{ fmtQty(lot.original_quantity) }}</td>
+                <td class="py-3 px-3 text-right font-mono text-ink">{{ fmtQty(lot.quantity_remaining) }}</td>
                 <td class="py-3 pl-3 pr-5">
                   <span
                     class="rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
@@ -386,140 +369,75 @@ const fmtDate = (d: string) =>
                         ? 'bg-elevated text-ink-ghost'
                         : 'bg-gain/10 text-gain'"
                   >
-                    {{ lot.is_locked
-                      ? `Locked until ${fmtDate(lot.locked_until!)}`
-                      : lot.is_exhausted ? 'Exhausted' : 'Active' }}
+                    {{ lot.is_locked ? `Locked until ${fmtDate(lot.locked_until!)}` : lot.is_exhausted ? 'Exhausted' : 'Active' }}
                   </span>
                 </td>
               </tr>
             </tbody>
           </table>
+
+          <!-- Lot summary -->
+          <div class="border-t border-border bg-elevated/40 px-4 py-3">
+            <div class="flex items-center gap-8 text-xs">
+              <div>
+                <span class="text-ink-ghost">Total Qty</span>
+                <span class="ml-2 font-mono font-medium text-ink">
+                  {{ fmtQty(lots.reduce((s, l) => s + l.quantity_remaining, 0)) }}
+                </span>
+              </div>
+              <div>
+                <span class="text-ink-ghost">Invested</span>
+                <span class="ml-2 font-mono font-medium text-ink">
+                  {{ fmtCurrency(lots.reduce((s, l) => s + l.quantity_remaining * l.buy_price, 0)) }}
+                </span>
+              </div>
+              <div v-if="valuation">
+                <span class="text-ink-ghost">Current Value</span>
+                <span class="ml-2 font-mono font-medium text-ink">
+                  {{ fmtCurrency(lots.reduce((s, l) => s + l.quantity_remaining * valuation!.current_price, 0)) }}
+                </span>
+              </div>
+            </div>
+          </div>
         </AppCard>
-      </div>
+      </template>
 
-      <!-- ── Tax Tab ─────────────────────────────────────────────────────── -->
-      <div v-else-if="activeTab === 'tax'" class="space-y-4">
-        <div v-if="loading" class="flex items-center justify-center py-12 text-ink-dim">
-          <svg class="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          Loading…
-        </div>
-
-        <template v-else-if="mergedTax">
-          <!-- Tax summary -->
-          <AppCard>
-            <div class="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3">
-              <div>
-                <p class="text-xs text-ink-ghost">STCG Gain</p>
-                <p class="mt-0.5 font-mono font-medium text-ink">
-                  {{ fmtCurrency(mergedTax.stcg_gain) }}
-                </p>
-              </div>
-              <div>
-                <p class="text-xs text-ink-ghost">STCG Tax (15%)</p>
-                <p class="mt-0.5 font-mono font-medium text-ink">
-                  {{ fmtCurrency(mergedTax.stcg_tax) }}
-                </p>
-              </div>
-              <div>
-                <p class="text-xs text-ink-ghost">LTCG Gain</p>
-                <p class="mt-0.5 font-mono font-medium text-ink">
-                  {{ fmtCurrency(mergedTax.ltcg_gain) }}
-                </p>
-              </div>
-              <div>
-                <p class="text-xs text-ink-ghost">LTCG Exemption (₹1L)</p>
-                <p class="mt-0.5 font-mono font-medium text-ink">
-                  {{ fmtCurrency(mergedTax.ltcg_exemption) }}
-                </p>
-              </div>
-              <div>
-                <p class="text-xs text-ink-ghost">LTCG Taxable Gain</p>
-                <p class="mt-0.5 font-mono font-medium text-ink">
-                  {{ fmtCurrency(mergedTax.ltcg_taxable_gain) }}
-                </p>
-              </div>
-              <div>
-                <p class="text-xs text-ink-ghost">LTCG Tax (10%)</p>
-                <p class="mt-0.5 font-mono font-medium text-ink">
-                  {{ fmtCurrency(mergedTax.ltcg_tax) }}
-                </p>
-              </div>
+      <!-- ── Tax ──────────────────────────────────────────────────────────── -->
+      <template v-if="mergedTax && mergedTax.total_tax > 0">
+        <AppCard>
+          <h2 class="mb-4 text-sm font-medium text-ink">Tax Summary</h2>
+          <div class="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3">
+            <div>
+              <p class="text-xs text-ink-ghost">STCG Gain</p>
+              <p class="mt-0.5 font-mono font-medium text-ink">{{ fmtCurrency(mergedTax.stcg_gain) }}</p>
             </div>
-            <div class="mt-4 flex items-center justify-between border-t border-border pt-4">
-              <p class="text-sm font-medium text-ink">Total Estimated Tax</p>
-              <p class="font-mono text-lg font-semibold text-loss">
-                {{ fmtCurrency(mergedTax.total_tax) }}
-              </p>
+            <div>
+              <p class="text-xs text-ink-ghost">STCG Tax (15%)</p>
+              <p class="mt-0.5 font-mono font-medium text-ink">{{ fmtCurrency(mergedTax.stcg_tax) }}</p>
             </div>
-          </AppCard>
-
-          <!-- Breakdown table -->
-          <AppCard :padding="false">
-            <div v-if="!mergedTax.breakdown.length" class="py-12 text-center text-sm text-ink-dim">
-              No realised gains to report.
+            <div>
+              <p class="text-xs text-ink-ghost">LTCG Gain</p>
+              <p class="mt-0.5 font-mono font-medium text-ink">{{ fmtCurrency(mergedTax.ltcg_gain) }}</p>
             </div>
-            <table v-else class="w-full text-sm">
-              <thead>
-                <tr class="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-ghost">
-                  <th class="py-3 pl-5 pr-3">Buy Date</th>
-                  <th class="py-3 px-3">Sell Date</th>
-                  <th class="py-3 px-3 text-right">Months</th>
-                  <th class="py-3 px-3 text-right">Qty</th>
-                  <th class="py-3 px-3 text-right">Buy ₹</th>
-                  <th class="py-3 px-3 text-right">Sell ₹</th>
-                  <th class="py-3 px-3 text-right">Gain</th>
-                  <th class="py-3 pl-3 pr-5">Type</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="row in mergedTax.breakdown"
-                  :key="row.lot_id"
-                  class="border-b border-border last:border-0"
-                >
-                  <td class="py-3 pl-5 pr-3 font-mono text-xs text-ink-dim">
-                    {{ fmtDate(row.buy_date) }}
-                  </td>
-                  <td class="py-3 px-3 font-mono text-xs text-ink-dim">
-                    {{ fmtDate(row.sell_date) }}
-                  </td>
-                  <td class="py-3 px-3 text-right font-mono text-ink-dim">
-                    {{ row.holding_months }}
-                  </td>
-                  <td class="py-3 px-3 text-right font-mono text-ink">
-                    {{ fmtQty(row.quantity) }}
-                  </td>
-                  <td class="py-3 px-3 text-right font-mono text-ink-dim">
-                    ₹{{ fmt(row.buy_price) }}
-                  </td>
-                  <td class="py-3 px-3 text-right font-mono text-ink-dim">
-                    ₹{{ fmt(row.sell_price) }}
-                  </td>
-                  <td
-                    class="py-3 px-3 text-right font-mono font-medium"
-                    :class="row.gain >= 0 ? 'text-gain' : 'text-loss'"
-                  >
-                    {{ row.gain >= 0 ? '+' : '' }}{{ fmtCurrency(row.gain) }}
-                  </td>
-                  <td class="py-3 pl-3 pr-5">
-                    <span
-                      class="rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
-                      :class="row.type === 'LTCG'
-                        ? 'bg-gain/10 text-gain'
-                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'"
-                    >
-                      {{ row.type }}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </AppCard>
-        </template>
-      </div>
+            <div>
+              <p class="text-xs text-ink-ghost">LTCG Exemption (₹1L)</p>
+              <p class="mt-0.5 font-mono font-medium text-ink">{{ fmtCurrency(mergedTax.ltcg_exemption) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-ink-ghost">LTCG Taxable</p>
+              <p class="mt-0.5 font-mono font-medium text-ink">{{ fmtCurrency(mergedTax.ltcg_taxable_gain) }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-ink-ghost">LTCG Tax (10%)</p>
+              <p class="mt-0.5 font-mono font-medium text-ink">{{ fmtCurrency(mergedTax.ltcg_tax) }}</p>
+            </div>
+          </div>
+          <div class="mt-4 flex items-center justify-between border-t border-border pt-4">
+            <p class="text-sm font-medium text-ink">Total Estimated Tax</p>
+            <p class="font-mono text-lg font-semibold text-loss">{{ fmtCurrency(mergedTax.total_tax) }}</p>
+          </div>
+        </AppCard>
+      </template>
 
     </template>
   </div>

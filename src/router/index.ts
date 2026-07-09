@@ -53,6 +53,10 @@ const router = createRouter({
           path: 'stocks/list',
           component: () => import('@/views/admin/AdminStockListView.vue'),
         },
+        {
+          path: 'stocks/price-sync',
+          component: () => import('@/views/admin/AdminPriceSyncView.vue'),
+        },
       ],
     },
   ],

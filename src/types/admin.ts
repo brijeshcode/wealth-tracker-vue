@@ -63,3 +63,35 @@ export interface AdminStockUpdatePayload {
   industry?: string
   is_active?: boolean
 }
+
+export type PriceSyncStatus = 'success' | 'skipped' | 'failed'
+
+export interface PriceSyncResult {
+  status: PriceSyncStatus
+  stocks_updated: number
+  message: string
+}
+
+export interface BackfillResult {
+  success: number
+  skipped: number
+  failed: number
+  detail: Record<string, PriceSyncResult>
+}
+
+export interface SyncLog {
+  id: number
+  price_date: string
+  status: PriceSyncStatus
+  triggered_by: 'api' | 'scheduler'
+  stocks_updated: number
+  message: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SyncLogParams {
+  status?: PriceSyncStatus
+  page_size?: number
+  page?: number
+}

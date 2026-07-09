@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
-import { Lock, Loader2, UploadCloud, PenLine, LayoutDashboard, List } from 'lucide-vue-next'
+import { Lock, Loader2, UploadCloud, PenLine, LayoutDashboard, List, RefreshCw } from 'lucide-vue-next'
 import { adminService } from '@/services/adminService'
 
 type AccessState = 'checking' | 'granted' | 'denied'
@@ -79,6 +79,14 @@ onMounted(async () => {
         >
           <List class="h-4 w-4 shrink-0" />
           Stock List
+        </RouterLink>
+        <RouterLink
+          to="/admin/stocks/price-sync"
+          class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-ink-dim transition-colors hover:bg-elevated hover:text-ink"
+          active-class="bg-elevated text-ink font-medium"
+        >
+          <RefreshCw class="h-4 w-4 shrink-0" />
+          Price Sync
         </RouterLink>
       </nav>
       <div class="border-t border-border px-3 py-3">

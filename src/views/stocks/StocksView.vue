@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, PlusCircle, ChevronRight, Eye, Upload } from 'lucide-vue-next'
+import { Plus, PlusCircle, ChevronRight, Eye, Upload, Trash2 } from 'lucide-vue-next'
 import { useStocksStore } from '@/stores/useStocksStore'
 import type { StockHolding } from '@/types/stocks'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -54,18 +54,20 @@ const groups = computed<StockGroup[]>(() => {
       totalQty > 0
         ? holdings.reduce((s, h) => s + h.quantity * h.avg_buy_price, 0) / totalQty
         : 0
+    const totalCostBasis = holdings.reduce((s, h) => s + h.cost_basis, 0)
 
-    const latestPrice = first.stock?.latest_price as any
-    const currentPrice: number | null = latestPrice?.price ?? null
+    const valuation = first.valuation
+    const currentPrice = valuation?.current_price ?? null
     const currentValue = currentPrice !== null ? totalQty * currentPrice : null
-    const costBasis = totalQty * weightedAvg
-    const unrealizedPnl = currentValue !== null ? currentValue - costBasis : null
+    const unrealizedPnl = currentValue !== null ? currentValue - totalCostBasis : null
     const unrealizedPnlPct =
-      unrealizedPnl !== null && costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : null
+      unrealizedPnl !== null && totalCostBasis > 0
+        ? (unrealizedPnl / totalCostBasis) * 100
+        : null
 
     const platforms: PlatformRow[] = holdings.map((h) => ({
       holdingId: h.id,
-      platformName: (h.holding?.platform as any)?.display_name ?? 'Unknown',
+      platformName: h.holding?.platform?.display_name ?? 'Unknown',
       exchange: h.exchange,
       quantity: h.quantity,
       avgBuyPrice: h.avg_buy_price,
@@ -79,7 +81,7 @@ const groups = computed<StockGroup[]>(() => {
       totalQty,
       weightedAvg,
       currentPrice,
-      priceDate: latestPrice?.price_date ?? null,
+      priceDate: valuation?.price_date ?? null,
       currentValue,
       unrealizedPnl,
       unrealizedPnlPct,
@@ -91,7 +93,7 @@ const groups = computed<StockGroup[]>(() => {
 // ── Summary stats ─────────────────────────────────────────────────────────────
 
 const totalInvested = computed(() =>
-  groups.value.reduce((s, g) => s + g.totalQty * g.weightedAvg, 0),
+  store.holdings.reduce((s, h) => s + h.cost_basis, 0),
 )
 const totalValue = computed(() =>
   groups.value.reduce((s, g) => s + (g.currentValue ?? g.totalQty * g.weightedAvg), 0),
@@ -125,6 +127,20 @@ const fmtQty = (n: number) =>
   new Intl.NumberFormat('en-IN', { maximumFractionDigits: 4 }).format(n)
 
 // ── Transaction panels ────────────────────────────────────────────────────────
+
+// ── Delete holding ────────────────────────────────────────────────────────────
+
+const deletingHoldingId = ref<number | null>(null)
+
+async function confirmDeleteHolding(holdingId: number, platformName: string) {
+  if (!confirm(`Delete holding at ${platformName}? This cannot be undone.`)) return
+  deletingHoldingId.value = holdingId
+  try {
+    await store.deleteHolding(holdingId)
+  } finally {
+    deletingHoldingId.value = null
+  }
+}
 
 const addOpen = ref(false)
 const quickOpen = ref(false)
@@ -371,8 +387,18 @@ const openQuick = (group: StockGroup) => {
                   </div>
                 </td>
 
-                <!-- empty actions cell -->
-                <td class="py-2.5 pl-3 pr-5"></td>
+                <td class="py-2.5 pl-3 pr-5">
+                  <div class="flex items-center justify-end">
+                    <button
+                      class="cursor-pointer rounded-lg p-1.5 text-ink-ghost transition-colors hover:bg-elevated hover:text-loss"
+                      title="Delete holding"
+                      :disabled="deletingHoldingId === platform.holdingId"
+                      @click="confirmDeleteHolding(platform.holdingId, platform.platformName)"
+                    >
+                      <Trash2 class="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
               </tr>
             </template>
           </template>

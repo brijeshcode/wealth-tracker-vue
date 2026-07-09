@@ -48,12 +48,15 @@ export function useStockDetail(stockId: number) {
     return holdings.value.reduce((sum, h) => sum + h.quantity * h.avg_buy_price, 0) / total
   })
 
-  const currentValue = computed(() => {
-    const price = stockInfo.value?.latest_price?.price ?? null
-    return price !== null ? totalQty.value * price : null
-  })
+  const valuation = computed(() => holdings.value[0]?.valuation ?? null)
 
-  const costBasis = computed(() => totalQty.value * weightedAvg.value)
+  const currentValue = computed(() =>
+    valuation.value !== null ? totalQty.value * valuation.value.current_price : null,
+  )
+
+  const costBasis = computed(() =>
+    holdings.value.reduce((s, h) => s + h.cost_basis, 0),
+  )
 
   const unrealizedPnl = computed(() =>
     currentValue.value !== null ? currentValue.value - costBasis.value : null,
@@ -64,6 +67,8 @@ export function useStockDetail(stockId: number) {
       ? (unrealizedPnl.value / costBasis.value) * 100
       : null,
   )
+
+  const priceDate = computed(() => valuation.value?.price_date ?? null)
 
   const holdingAgeDays = computed(() => {
     const buyDates = mergedTransactions.value
@@ -163,9 +168,15 @@ export function useStockDetail(stockId: number) {
     }
   }
 
+  function removeTransaction(id: number) {
+    mergedTransactions.value = mergedTransactions.value.filter((t) => t.id !== id)
+  }
+
   return {
     holdings,
     stockInfo,
+    valuation,
+    priceDate,
     totalQty,
     weightedAvg,
     currentValue,
@@ -180,5 +191,6 @@ export function useStockDetail(stockId: number) {
     mergedTax,
     loading,
     fetchAll,
+    removeTransaction,
   }
 }

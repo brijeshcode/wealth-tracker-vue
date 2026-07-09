@@ -18,10 +18,12 @@ export interface Platform {
   display_name: string
 }
 
-export interface LatestPrice {
-  price: number
+export interface StockValuation {
+  current_price: number
   price_date: string
-  change_percent: number | null
+  current_value: number
+  unrealized_pnl: number
+  unrealized_pnl_pct: number
 }
 
 export interface StockHolding {
@@ -30,6 +32,8 @@ export interface StockHolding {
   exchange: Exchange
   quantity: number
   avg_buy_price: number
+  cost_basis: number
+  valuation: StockValuation | null
   holding: {
     id: number
     nickname: string | null
@@ -42,7 +46,7 @@ export interface StockHolding {
     id: number
     company_name: string
     nse_symbol: string | null
-    latest_price: LatestPrice | null
+    isin: string
   }
 }
 
